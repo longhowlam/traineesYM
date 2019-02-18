@@ -1404,7 +1404,28 @@ ggplot(forecast1, aes(ds,yhat)) +
   geom_line(data = forecast2, aes(ds,yhat), col=2)
 ```
 
-# The mlr package
+
+# text2vec
+
+---
+
+## topic modeling
+NOS = readRDS
+
+```{r}
+library(dplyr)
+NOS = readRDS("data/NOS_Nieuws.RDs")
+
+ondubbel op artikel....
+```
+
+
+
+
+
+
+
+# The mlr package (OPTIONEEL)
 
 ---
 
