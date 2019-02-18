@@ -1410,16 +1410,150 @@ ggplot(forecast1, aes(ds,yhat)) +
 ---
 
 ## topic modeling
-NOS = readRDS
 
-```{r}
+
+```{r, eval = FALSE}
+library(text2vec)
 library(dplyr)
+library(stringr)
+library(wordcloud)
+library(wordcloud2)
 NOS = readRDS("data/NOS_Nieuws.RDs")
+# ondubbel op artikel....
+NOS = distinct(NOS, titel, .keep_all = TRUE  )
 
-ondubbel op artikel....
 ```
 
 
+```{r}
+#### prep functie
+
+prep_fun = function(x) {
+  x %>% 
+    # make text lower case
+    str_to_lower %>% 
+    # remove non-alphanumeric symbols
+    str_replace_all("[^[:alnum:]]", " ") %>% 
+    # collapse multiple spaces
+    str_replace_all("\\s+", " ")
+}
+
+tmp = "Blabla 123h    o *&^%"
+prep_fun(tmp)
+
+###### text bewerking ###################################################################
+
+# gebruik bovenstaande prep functie om RedenBezwaar te bewerken
+NOS = NOS %>% 
+  mutate(
+    id = 1:n(),
+    art = prep_fun(art),
+    NWoorden = str_count(art, "\\w+"),
+  )
+
+## plaatje van aantal woorden en tabel met talen
+summary(NOS$NWoorden)
+hist(NOS$NWoorden, nclass  =100)
+
+## pak nu alleen Nederlandse bezwaren met meer dan 7 woorden
+NOS = NOS %>% 
+  filter(
+    NWoorden > 20
+  ) 
+
+######## Tokenize en maak vocabulaire ###################################################
+
+it_train = itoken(
+  NOS$art, 
+  preprocessor = prep_fun,
+  tokenizer = word_tokenizer, 
+  ids = NOS$id,
+  progressbar = TRUE
+)
+
+stopwoorden = c(
+  stopwords::stopwords("nl"),
+  letters,
+  1:9
+)
+
+vocab = create_vocabulary(
+  it_train,
+  ngram = c(1L,2L),
+  stopwords = stopwoorden
+)
+
+# haal te weinig en ook te veel voorkomende woorden weg
+pruned_vocab = prune_vocabulary(
+  vocab, 
+  term_count_min = 5, 
+  doc_proportion_max = 0.85,
+  doc_proportion_min = 0.001
+)
+
+
+#########################################################################################
+
+#####  wordcloud voor eerst inzcht #######
+pal <- brewer.pal(9,"BuGn")
+pal <- pal[-(1:4)]
+
+
+wordcloud(
+  pruned_vocab$term, 
+  pruned_vocab$term_count,
+  scale = c(5,.4),
+  min.freq = 3000,
+  max.words = 200,
+  colors= pal)
+
+wordcloud2(pruned_vocab, shape = "star")
+
+
+##########################################################################################
+####### Topic modeling ###################################################################
+
+vectorizer = vocab_vectorizer(
+  vocabulary = pruned_vocab
+)
+dtm = create_dtm(it_train, vectorizer, type = "dgTMatrix")
+dim(dtm)
+
+dtm[1,]
+
+lda_model = LDA$new(
+  n_topics = 10, 
+  doc_topic_prior = 0.1, 
+  topic_word_prior = 0.01
+)
+
+doc_topic_distr = lda_model$fit_transform(
+  x = dtm, n_iter = 1000, 
+  convergence_tol = 0.0001, n_check_convergence = 25, 
+  progressbar = FALSE)
+
+
+### resultaat in de vorm van tabel ###########
+
+## worden per topic
+onderwerpen = as.data.frame(
+  lda_model$get_top_words(
+    n = 15, lambda = 1
+  )
+)
+names(onderwerpen) = paste0("TOPIC_", 1:10)
+DT::datatable(onderwerpen,  options=list(pageLength = 15))
+
+
+NOS$topic = apply(doc_topic_distr, 1, which.max)
+NOS %>% group_by(topic) %>% summarise(n=n())
+
+####### visualisatie ##################
+
+## heel makkelijk een topic te spotten met engelse texten 
+lda_model$plot()
+
+```
 
 
 
