@@ -979,6 +979,326 @@ Als je klaar bent: disconnect van MySQL
 dbDisconnect(con_sql)
 ```
 
+# ggplot2
+
+
+---
+
+The grammar of graphics: ggplot2. Een plot wordt gemaakt door layers op elkaar te leggen, elke laag kan worden beschreven met zogenaamde *aesthetics* (stijlen). Elke laag kan in een variabele opgeslagen worden en deze kunnen bij elkaar 'opgeteld' worden tot een uiteindelijke plot. 
+
+Hieronder een eerste voorbeeldje van een ggplot op de `mtcars` data set.
+
+```{r, eval=FALSE}
+## een laag p
+p = ggplot(mtcars, aes(x=hp, y = mpg))
+p
+## wat is p
+class(p)
+typeof(p)
+
+## voeg een laag punten toe
+p = p + geom_point()
+
+p
+```
+
+
+Laat de plot zien door hem te 'printen'.
+
+```{r, eval=FALSE}
+q = geom_point(aes(x = hp, y = cyl), col=2)
+
+r = p + q
+r
+
+## Een titel is ook een laag
+p = p + ggtitle("AUTO PLOTS \n EEN VOORBEELDJE") 
+p
+```
+
+De algemene graphing template in ggplot heeft de volgende vorm:
+
+```{r, eval=FALSE, include=FALSE}
+ggplot(data = <DATA>) + 
+  <GEOM_FUNCTION>(mapping = aes(<MAPPINGS>))
+```
+
+## geom_... functies
+
+Er zijn diverse geom_... functies, we zullen hieronder er een paar laten zien. 
+
+Histogrammen zijn een handige manier om snel een indruk te krijgen van de verdeling van de data
+
+```{r, eval=FALSE}
+#### histogrammen
+p = ggplot(data = mpg, aes(displ)) 
+  
+p + geom_histogram()
+
+## er zijn diverse opties die je mee kunt geven
+p + geom_histogram(
+  bins = 10,
+  col="red",
+  fill="green", 
+  alpha = .82
+) 
+```
+
+Box plots kan je ook gebruiken om een indruk te krijgen van de verdeling van de data. Ze bevatten visueel wat minder detail dan histogrammen, maar je kan er makkelijk een aantal naast elkaar zijn. We gebruiken de `mpg` data set en kijken naar de verdeling van highway miles per gallon (hwy) voor verschillende type autos.
+
+```{r, eval=FALSE}
+p = ggplot(mpg, aes(class, hwy)) + geom_boxplot()
+p
+```
+
+Je kan ook groupeerde boxplots maken en de volgorde van de boxplots wijzigen, bijvoorbeeld op aflopende mediaan.
+
+```{r, eval=FALSE}
+p = ggplot(
+  mpg,
+  aes(
+    reorder(
+      class,
+      hwy,
+      median
+    ),
+  hwy, 
+  fill = factor(year)))
+
+p + geom_boxplot()
+```
+
+## lijn grafieken
+
+Lijn grafieken zijn handig om tijdreeksen te visualiseren
+
+```{r, eval=FALSE}
+df = data.frame(
+  x = 1:100, 
+  y = rnorm(100)
+)
+
+p = ggplot(
+  df, 
+  aes(x = x, y = y)
+  )
+
+p + geom_line()
+p + geom_line(color="blue", size = 2)
+```
+
+When the x values are dates ggplot will take care of it!
+
+```{r, eval=FALSE}
+df = data.frame(
+  x = anytime::anydate("2017-01-01") + 1:100,
+  y = rnorm(100)
+)
+
+p = ggplot(
+  df, 
+  aes(x=x,y=y)
+  )
+
+p + geom_line()
+```
+
+## bar plots
+
+Bar plots zijn handig om bijvoorbeeld aantallen per categorie te visualiseren. Laten we naar top 10 keukens kijken in 'restaurant' data. Deze data heb ik een tijdje geleden van de site Iens gescraped, er staan 20.000 restaurants in met een aantal kenmerken.
+
+```{r, eval=FALSE, fig.width=10, fig.height=8}
+restaurants = read_csv("data/Restaurants.csv")
+
+restaurants %>%
+  group_by(keuken) %>%
+  summarise(n=n()) %>%
+  arrange(desc(n)) %>% 
+  filter(!is.na(keuken)) %>%
+  slice(1:10) %>%
+  ggplot(aes(x=keuken)) + 
+  geom_bar(aes(weight=n))
+```
+
+Je kan sorteren 
+
+```{r, eval=FALSE, fig.width=12}
+restaurants %>%
+  group_by(
+    keuken
+  ) %>%
+  summarise(
+    n=n()
+  ) %>%
+  filter(
+    !is.na(keuken)
+  ) %>%
+  arrange(
+    desc(n)
+  ) %>% 
+  slice(1:10) %>%
+  mutate(
+    keuken = forcats::fct_reorder(keuken, n)
+  ) %>%
+  ggplot(aes(x=keuken)) + 
+  geom_bar(aes(weight=n))
+
+```
+
+Je kan stacked en of grouped bar charts maken om meer dimensies te visualiseren
+
+```{r, eval=FALSE}
+test = restaurants %>% 
+  filter(
+    plaats %in% c("Rotterdam", "Utrecht", "Amsterdam")
+  ) %>%
+  group_by(
+    keuken, plaats
+  ) %>%
+  summarise(
+    n=n()
+  ) %>%
+  filter(
+    !is.na(keuken)
+  ) 
+   
+##  in de aes kun je fill opgeven en met position kan je stacked of grouped opgeven 
+test %>%
+  ggplot(aes(x=keuken, y = n, fill = plaats)) + 
+  geom_bar(stat="identity")
+
+test %>%
+  ggplot(aes(x=keuken, y = n, fill=plaats)) + 
+  geom_bar(stat="identity", position = "dodge") 
+```
+
+Soms wil je horizontale barcharts, gebruik dan nog een extra coordinate flip.
+
+```{r, eval=FALSE}
+test %>%
+  ggplot(aes(x=keuken, y = n, fill=plaats)) + 
+  geom_bar(stat="identity", position = "dodge") +
+   coord_flip()
+```
+
+## geom_bin2d
+
+Heatmaps of 2d bin plots kunnen handig zijn om data met veel punten inzichtelijker te maken. Bij veel punten kan je een waarde voor alpha instellen of gebruik maken van 2d bin plots.
+
+```{r, eval=FALSE}
+df = data.frame(x=rnorm(100000), y=rnorm(100000))
+
+ggplot(df, aes(x=x,y=y)) + geom_point()
+
+ggplot(df, aes(x=x,y=y)) + geom_point(alpha=0.007 )
+
+ggplot(df, aes(x=x,y=y)) + geom_bin2d(bins = 100)
+```
+
+
+## Kaartjes maken 
+
+### geom_map
+
+Met geom_map kun je kaarten maken. Als je de kaart van Nederland wil maken zul je die eerst ergens vandaan moeten halen. Vanuit het `raster` package is er een handige functie `getData` om dit te doen.
+
+```{r, eval = FALSE}
+NLD <- gSimplify(getData("GADM", country= "NLD", level=1), tol=0.001, TRUE)
+NLD <- fortify(NLD)
+
+g1 <- ggplot() +
+  geom_map(
+    data = NLD, map=NLD, 
+    aes( x=long, y=lat, map_id=id, group=group),
+    fill=NA, color="black"
+    )
+g1
+```
+
+Gebruik de 'restaurant' data, in deze set staan ook de longitude en latitude coordinaten. Haal wat foute locaties weg.
+
+```{r, eval = FALSE}
+restaurants = readr::read_csv("data/Restaurants.csv")
+restaurants = restaurants %>% 
+  filter(
+    LONGs < 7,
+    LONGs > 3
+    )
+
+g2 <- g1 + geom_point(
+  data = restaurants,
+  aes(x = LONGs, y = LATs),
+  size=1.7, 
+  color = "red",
+  alpha=0.06, 
+  na.rm=TRUE
+)
+g2
+```
+
+### ggmap
+
+Er is recentelijk een makkelijkere manier met het package `ggmap`. Je kan hiermee kaartjes van google maps downloaden en als achtergrond kaart gebruiken voor plots.
+
+Helaas is dit niet meer gratis en moet je je registreren en een API key opvragen!!!  Je kan openstreetmaps of stamen maps gebruiken. Zie osm_test.R script als voorbeeld
+
+```{r, eval=FALSE}
+library(ggmap)
+## haal kaart van Nederland op, pak een center (long lat coordinaten)
+NLMap = ggmap(get_googlemap(center = c(4.8952,52.3702), scale=2, zoom=7), extent="normal")
+NLMap +
+  geom_point(
+    data = restaurants,
+    aes(x = LONGs, y = LATs),
+    size = 0.7, 
+    color = "red",
+    alpha = 0.06, 
+    na.rm = TRUE
+  )
+
+```
+
+
+## facets in ggplot
+
+Met `facets` kan je een matrix van plots maken. Een simpel voorbeeld is als je apart een histogram voor mannen en vrouwen wilt maken en dat naast elkaar of onder elkaar in een plot wilt zetten. Er zijn twee functies in ggplot2 die dit ondersteunen, `facet_grid` en `facet_wrap`
+
+```{r, eval=FALSE}
+## ik zie niks....
+restaurants %>%
+  ggplot(
+    aes(x=aantalreviews)
+  ) +
+  geom_histogram() + 
+facet_wrap(~keuken)
+
+top10 = restaurants %>%
+  group_by(keuken) %>%
+  summarise(n=n()) %>%
+  arrange(desc(n)) %>% 
+  filter(!is.na(keuken)) %>%
+  slice(1:10)
+
+restaurants %>%
+  inner_join(top10) %>%
+  ggplot(
+    aes(x=aantalreviews)
+  ) + 
+  geom_histogram() + facet_wrap(~keuken, ncol = 5)
+```
+
+```{r, eval = FALSE}
+restaurants %>% filter(prijs < 100) %>%
+  inner_join(top10) %>%
+  ggplot(
+    aes(x=aantalreviews, y = prijs)
+  ) + 
+  geom_point() + facet_wrap(~keuken, ncol = 5) + geom_smooth()
+```
+
+
+
+
 
 # Interactive grafieken
 

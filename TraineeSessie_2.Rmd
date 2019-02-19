@@ -1427,7 +1427,7 @@ library(wordcloud2)
 library(ggplot2)
 
 # lees data in
-NOS = readRDS("data/NOS_Nieuws.RDs")
+NOS = readRDS("data/NOS_Nieuwsberichten.RDs")
 # ondubbel op artikel....
 NOS = distinct(NOS, titel, .keep_all = TRUE  )
 
@@ -1437,10 +1437,10 @@ NOS %>% group_by(Datum) %>% summarise(n=n()) %>%
 
 ```
 
-Eerst wat preparatie van de teksten 
+Eerst wat preparatie van de teksten, zoals niet alpha num characters en stopwoorden weghalen.
+
 ```{r}
 #### prep functie
-
 prep_fun = function(x) {
   x %>% 
     # make text lower case
@@ -1450,13 +1450,11 @@ prep_fun = function(x) {
     # collapse multiple spaces
     str_replace_all("\\s+", " ")
 }
-
+#voorbeeldje
 tmp = "Blabla 123h    o *&^%"
 prep_fun(tmp)
 
-###### text bewerking ###################################################################
-
-# gebruik bovenstaande prep functie om RedenBezwaar te bewerken
+## gebruik bovenstaande prep functie om art te bewerken
 NOS = NOS %>% 
   mutate(
     id = 1:n(),
@@ -1465,22 +1463,23 @@ NOS = NOS %>%
   )
 
 ## plaatje van aantal woorden en tabel met talen
-summary(NOS$NWoorden)
-hist(NOS$NWoorden, nclass  =100)
+ggplot(NOS, aes(NWoorden)) + geom_histogram(bins=70, col="black")
 ```
 
 
-
+Filter te korte en te lang artikelen er uit
 
 ```{r eval = FALSE}
-## pak nu alleen Nederlandse bezwaren met meer dan 7 woorden
 NOS = NOS %>% 
   filter(
-    NWoorden > 20
+    NWoorden > 30,
+    NWoorden < 1000
   ) 
+```
 
-######## Tokenize en maak vocabulaire ###################################################
+We gaan nu de nieuwsberichten tokenizen en maken een vocabulaire zonder stopwoorden. 
 
+```{r eval = FALSE}
 it_train = itoken(
   NOS$art, 
   preprocessor = prep_fun,
@@ -1492,7 +1491,8 @@ it_train = itoken(
 stopwoorden = c(
   stopwords::stopwords("nl"),
   letters,
-  1:9
+  1:9,
+  c("volgens", "we")
 )
 
 vocab = create_vocabulary(
@@ -1501,44 +1501,65 @@ vocab = create_vocabulary(
   stopwords = stopwoorden
 )
 
-# haal te weinig en ook te veel voorkomende woorden weg
+vocab
+```
+
+De vocabulaire bestaat uit (te) veel woorden, we kunnen gaan prunen. Haal te weinig en ook te veel voorkomende woorden weg.
+
+```{r eval = FALSE}
 pruned_vocab = prune_vocabulary(
   vocab, 
   term_count_min = 5, 
   doc_proportion_max = 0.85,
-  doc_proportion_min = 0.001
+  doc_proportion_min = 0.0025
 )
+pruned_vocab
+```
 
+Maak een wordcloud voor eerste inzchten.
 
-#########################################################################################
-
-#####  wordcloud voor eerst inzcht #######
+```{r eval = FALSE}
 pal <- brewer.pal(9,"BuGn")
 pal <- pal[-(1:4)]
-
 
 wordcloud(
   pruned_vocab$term, 
   pruned_vocab$term_count,
-  scale = c(5,.4),
+  scale = c(3,.2),
   min.freq = 3000,
   max.words = 200,
   colors= pal)
 
-wordcloud2(pruned_vocab, shape = "star")
+pruned_vocab %>%
+  filter(term_count > 1000) %>% 
+  wordcloud2( shape = "star")
+
+#Zipf's law
+pruned_vocab %>% 
+  arrange(desc(term_count)) %>% 
+  mutate(
+    rank = 1:n(),
+    
+  ) %>% 
+  ggplot(aes(log(rank),log2(term_count))) + geom_point()
+
+```
 
 
-##########################################################################################
-####### Topic modeling ###################################################################
+And now perform topic modeling. Maak eerst een zogenaamde document term matrix aan. In deze matrix is het aantal rijen het aantal documenten / nieuwsberichten en het aantal kolommen is het aantal termen.
 
+```{r eval = FALSE}
 vectorizer = vocab_vectorizer(
   vocabulary = pruned_vocab
 )
 dtm = create_dtm(it_train, vectorizer, type = "dgTMatrix")
+
 dim(dtm)
-
 dtm[1,]
+```
 
+
+```{r eval = FALSE}
 lda_model = LDA$new(
   n_topics = 10, 
   doc_topic_prior = 0.1, 
@@ -1550,9 +1571,11 @@ doc_topic_distr = lda_model$fit_transform(
   convergence_tol = 0.0001, n_check_convergence = 25, 
   progressbar = FALSE)
 
+```
 
-### resultaat in de vorm van tabel ###########
+resultaat in de vorm van tabel en grafiek
 
+```{r eval = FALSE}
 ## worden per topic
 onderwerpen = as.data.frame(
   lda_model$get_top_words(
