@@ -1405,26 +1405,39 @@ ggplot(forecast1, aes(ds,yhat)) +
 ```
 
 
-# text2vec
+# Topic modeling
+
+Als je heel veel teksten / documenten hebt wil je vaak weten wat voor onderwerpen er in die documenten in hoofdlijnen zitten. Je kan dit doen met topic modeling, een vaak gebruikt algoritme is Latent Dirichlet Allocation (LDA) in het `text2vec` package.
+
 
 ---
 
-## topic modeling
+## NOS Nieuwsberichten
+
+Om het een en ander te illustreren heb ik wat NOS nieuwsberichten gescraped en bekijken we wat er voor topics te vinden zijn. 
 
 
 ```{r, eval = FALSE}
+# packages nodig voor deze analyse
 library(text2vec)
 library(dplyr)
 library(stringr)
 library(wordcloud)
 library(wordcloud2)
+library(ggplot2)
+
+# lees data in
 NOS = readRDS("data/NOS_Nieuws.RDs")
 # ondubbel op artikel....
 NOS = distinct(NOS, titel, .keep_all = TRUE  )
 
+# plaatje aantal artikelen per dag
+NOS %>% group_by(Datum) %>% summarise(n=n()) %>% 
+  ggplot(aes(Datum,n)) + geom_line()
+
 ```
 
-
+Eerst wat preparatie van de teksten 
 ```{r}
 #### prep functie
 
@@ -1448,13 +1461,18 @@ NOS = NOS %>%
   mutate(
     id = 1:n(),
     art = prep_fun(art),
-    NWoorden = str_count(art, "\\w+"),
+    NWoorden = str_count(art, "\\w+")
   )
 
 ## plaatje van aantal woorden en tabel met talen
 summary(NOS$NWoorden)
 hist(NOS$NWoorden, nclass  =100)
+```
 
+
+
+
+```{r eval = FALSE}
 ## pak nu alleen Nederlandse bezwaren met meer dan 7 woorden
 NOS = NOS %>% 
   filter(
