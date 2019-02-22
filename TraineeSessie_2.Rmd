@@ -1437,6 +1437,8 @@ library(stringr)
 library(wordcloud)
 library(wordcloud2)
 library(ggplot2)
+library(tidystopwords)
+library(stopwords)
 
 # lees data in
 NOS = readRDS("data/NOS_Nieuwsberichten.RDs")
@@ -1492,6 +1494,7 @@ NOS = NOS %>%
 We gaan nu de nieuwsberichten tokenizen en maken een vocabulaire zonder stopwoorden. 
 
 ```{r eval = FALSE}
+## tokenize
 it_train = itoken(
   NOS$art, 
   preprocessor = prep_fun,
@@ -1500,6 +1503,12 @@ it_train = itoken(
   progressbar = TRUE
 )
 
+```
+
+Er zijn twee packages om makkelijk vectoren van stopwoorden te maken De packages `stopwords` en `tidystopwords`. Dit laatste package is iets uitgebreider.
+
+
+```{r eval = FALSE}
 stopwoorden = c(
   stopwords::stopwords("nl"),
   letters,
@@ -1507,6 +1516,13 @@ stopwoorden = c(
   c("volgens", "we")
 )
 
+stopwoorden2 = generate_stoplist(lang_name = "Dutch")
+```
+
+
+Maak nu een vocabulaire met de functie `create_vocabulaire` waar je ook ngrams kunt opgeven. Om niet te veel termen te genereren bekijk ik hier alleen 1 en 2 grams. Dus losse woorden en termen met twee aaneengesloten woorden.
+
+```{r eval = FALSE}
 vocab = create_vocabulary(
   it_train,
   ngram = c(1L,2L),
