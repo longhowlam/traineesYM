@@ -200,7 +200,8 @@ probeer wat verschillende variabelen al dan niet mee te nemen. Als je Merk meene
 
 ### Buckets / linear constant  en splines 
 
-Als een input variable niet linear is m.b.t. de target kan je deze niet-lineariteit modelleren met buckets (linear constante stukken) of met splines.
+Als een input variable niet linear is m.b.t. de target kan je deze niet-lineariteit modelleren met buckets (linear constante stukken). Een alternatief is  regression splines, aan elkaar geplakte polynomen.
+
 
 ```{r, eval = FALSE}
 library(ggplot2)
@@ -314,12 +315,39 @@ TTest = testing(myTitanSplit)
 ```
 
 
+## Verloop zien van een binaire target
+
+Voor een categorische variable kan je de relatie met een binaire target zien mbv group by statements (en eventueel barcharts)
+
+```{r}
+### maak eerst een 0/1 target kolom aan, 0 is N (niet overleefd), 1 is Y (wel overleefd)
+myTitan$Target = as.numeric(myTitan$Survived) - 1
+
+myTitan %>% group_by(Sex) %>%  summarise(survival = mean(Target))
+
+```
+
+Hoe kan je een idee krijgen van de relatie tussen een binaire target en een numerieke variabele? Gebruik smoothing plots
+
+```{r, eval = FALSE}
+library(ggplot2)
+
+### zonder smoothing, je ziet haast niks
+ggplot(myTitan, aes(Age, Target)) + geom_point()
+
+### met smoothing, de curve laat de waargenomen survival rate zien per leeftijd
+ggplot(myTitan, aes(Age, Target)) + geom_point() + geom_smooth()
+```
+
+
+
+
 ## logistic regression
 
 Een logistic regression is een van de simpelste predictive modellen om mee te beginnen als je classificatie wilt doen. We gaan uit van een binaire Target (Y /N). We gebruiken de `TTrain` data set die we zojuist gemaakt hebben om een model te fitten.
 
 ```{r, eval = FALSE}
-out.glm = glm(Survived ~ Sex + Age + Pclass,  data = TTrain , family = binomial)
+out.glm = glm(Survived ~ Sex + Age + Pclass + Fare,  data = TTrain , family = binomial)
 summary(out.glm)
 ```
 
@@ -329,7 +357,7 @@ Een decision tree genereert op basis van een algoritme regels die je kan gebruik
 
 ```{r, eval = FALSE}
 library(rpart)
-tree.out = rpart(Survived ~ Sex + Age +Pclass, data = TTrain)
+tree.out = rpart(Survived ~ Sex + Age + Pclass + Fare, data = TTrain)
 
 plot(tree.out)
 text(tree.out, use.n = TRUE)
@@ -356,7 +384,13 @@ visTree(tree.out, height = "800px", nodesPopSize = TRUE, minNodeSize = 10, maxNo
 Een random forest is een zogenaamde ensemble model. Het is de combinatie van (veel) verschillende decision trees. In R kan je met verschillende packages random forests fitten. Het package `ranger` is hier een van.
 
 ```{r, eval = FALSE}
-ranger.out = ranger( Survived ~ Sex + Age + Pclass, data = TTrain , probability = TRUE)
+ranger.out = ranger(
+  Survived ~ Sex + Age + Pclass + Fare, 
+  data = TTrain , 
+  probability = TRUE,
+  importance = 'impurity'
+)
+
 ranger.out
 ```
 
@@ -368,7 +402,7 @@ Met de library `xgboost` kan je in R extreme gradient boosting modellen fitten. 
 
 ```{r, eval = FALSE}
 library(Matrix)
-Titan_Inputmatrix = sparse.model.matrix( Survived ~ Sex + Age + Pclass, data = TTrain)
+Titan_Inputmatrix = sparse.model.matrix( Survived ~ Sex + Age + Pclass + Fare, data = TTrain)
 
 ## hoe ziet zo'n input matrix er uit? eerste 15 rijen
 Titan_Inputmatrix[1:15,]
@@ -445,14 +479,14 @@ hist(pred_xgboost)
 
 ### Variable importance in trees
 
-Als je een tree of ensemble van trees hebt getrained kan je een idee krijgen welke variabelen in het model belangrijk zijn geweest in het trainings proces. Laten we voor de tree modellen die we hierboven getraind hebben de variable importance zien.
+Als je een tree of ensemble van trees hebt getrained kan je een idee krijgen welke variabelen in het model belangrijk zijn geweest in het trainings proces. Laten we voor de tree modellen die we hierboven getraind hebben de variable importance zien. De absolute waarde van de variable importance plots zijn minder belangrijk dan de relatieve waarden (vergelijking tussen de variabelen).
 
 ```{r, eval = FALSE}
 # enkele decision tree
 tree.out$variable.importance
 
 # ranger random forest
-ranger.out$predict
+ranger.out$variable.importance
 
 # xgboost
 imp = xgb.importance( colnames(Titan_Inputmatrix), model = xgboost.out2)
@@ -460,7 +494,7 @@ imp
 xgb.plot.importance(imp)
 ```
 
-SHAP (SHapley Additive exPlanation values) per feature
+SHAP (SHapley Additive exPlanation values) per feature.
 
 ```{r}
 xgb.plot.shap(  Titan_Inputmatrix, model = xgboost.out2, top_n=100)
