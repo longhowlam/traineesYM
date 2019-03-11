@@ -865,7 +865,8 @@ Groceries
 itemFrequencyPlot(Groceries, topN = 35, cex.names = 0.75)
 ```
 
-Nu je de boodschappen als transaction object hebt kan je er market basket rules op los laten met behulp van het a-priori algoritme.
+Om de transacties die we net hebben ingelezen te genruiken in het `arules` package moeten we dus deze eerst in een `transaction` object zetten zoals in  bovenstaande code chunck is gebeurd. Nu je de boodschappen als transaction object hebt kan je er market basket rules op los laten met behulp van het a-priori algoritme.
+
 
 ```{r, eval= FALSE}
 rules <- apriori(Groceries, parameter = list(supp = 0.001, conf = 0.8))
@@ -970,7 +971,334 @@ visNetwork(nodes, rulesDF) %>%
    visEdges(smooth = FALSE) 
 ```
 
+
+<br>
+
+
+<br>
+
+# Tiijdreeks modellen met prophet
+
+---
+
+Prophet is een facebook package voor tijdreeks data, die zij zelf ook intern gebruiken. In plaats van de traditionale manier van tijdreeks modellen maken met ARIMA, worden zogenaamde additieve regressie modellen gefit. Zie hier de [paper](https://peerj.com/preprints/3190.pdf).
+
+Hier een voorbeeld op gescrapte Billy verkopen van de Ikea website
+
+```{r eval=FALSE}
+library(prophet)
+
+## dagelijke ikea billy verkoop data
+DailyBilly = readRDS("data/DailyBilly.RDs")
+ggplot(DailyBilly, aes(x=ds, y = y)) +  
+  geom_point() +
+  geom_line(col="grey", alpha = 0.85) + 
+  scale_x_date(breaks = "1 month")
+
+## billy forcast, fit eerst het model
+BillyF = prophet(DailyBilly)
+
+## dan aantal dagen vooruit maken waarop je gaat forecastem
+future = make_future_dataframe(BillyF, periods = 90)
+forecast = predict(BillyF, future)
+
+plot(BillyF, forecast)
+```
+
+Bovenstaande werkt nog niet echt..... We zetten seasonality aan.
+
+```{r eval = FALSE}
+## billy forcast, fit eerst het model
+BillyF = prophet(
+  DailyBilly,
+  weekly.seasonality = TRUE ,
+  yearly.seasonality = TRUE, 
+  daily.seasonality = FALSE
+)
+
+## dan aantal dagen vooruit maken waarop je gaat forecastem
+future = make_future_dataframe(BillyF, periods = 90)
+forecast = predict(BillyF, future)
+
+plot(BillyF, forecast)
+prophet_plot_components(BillyF, forecast)
+```
+
+Met prohet kan je ook externe regressors toevoegen aan het model. Laten we eens wat KNMI data bekijken (Wind, temperatauur, zonnestraling en neerslag)
+
+```{r eval = FALSE}
+library(readr)
+library(ggplot2)
+
+KNMI_20180101 = read_csv(
+   "data/KNMI_20180101.txt", 
+   col_types = cols(YYYYMMDD = col_date(format = "%Y%m%d"))
+)
+
+DailyBilly2 = DailyBilly %>%
+  left_join(
+    KNMI_20180101, 
+    by = c("ds" = "YYYYMMDD")
+  )
+
+```
+
+Check eerst even of er wat correlatie is tussen y (de billy verkopen) en KNMI variabelen.
+
+```{r eval = FALSE}
+library(corrplot)
+M = cor(
+  DailyBilly2 %>% 
+    select(y, FHVEC, FHX, TG, TN, Q, RH)
+  )
+
+corrplot(
+  M, 
+  method = "ellipse",
+  diag = FALSE,
+  addCoef.col = "black"
+)
+```
+
+
+```{r eval = FALSE}
+## het model moet nog niet gefit worden voordat je de regressor er aan toevoegt.
+BillyF = prophet(
+  weekly.seasonality = TRUE ,
+  yearly.seasonality = TRUE, 
+  daily.seasonality = TRUE,
+  fit = FALSE
+)  %>%
+  add_regressor("TG") %>% 
+  fit.prophet(df = DailyBilly2)
+
+## voorspel Billy Verkopen voor 10 graden C en 25 graden C.
+future = make_future_dataframe(BillyF, periods = 30)
+future$TG = 100
+future = future %>%  filter(ds > "2017-10-01")
+forecast1 = predict(BillyF, future)
+future$TG = 250
+forecast2 = predict(BillyF, future)
+
+### zet de twee voorspellingen uit.
+ggplot(forecast1, aes(ds,yhat)) + 
+  geom_line() + 
+  geom_line(data = forecast2, aes(ds,yhat), col=2)
+```
+
+
+# Topic modeling
+
+Als je heel veel teksten / documenten hebt wil je vaak weten wat voor onderwerpen er in die documenten in hoofdlijnen zitten. Je kan dit doen met topic modeling, een vaak gebruikt algoritme is Latent Dirichlet Allocation (LDA) in het `text2vec` package.
+
+
+---
+
+## NOS Nieuwsberichten
+
+Om het een en ander te illustreren heb ik wat NOS nieuwsberichten gescraped en bekijken we wat er voor topics te vinden zijn. 
+
+
+```{r, eval = FALSE}
+# packages nodig voor deze analyse
+library(text2vec)
+library(dplyr)
+library(stringr)
+library(wordcloud)
+library(wordcloud2)
+library(ggplot2)
+library(tidystopwords)
+library(stopwords)
+
+# lees data in
+NOS = readRDS("data/NOS_Nieuwsberichten.RDs")
+# ondubbel op artikel....
+NOS = distinct(NOS, titel, .keep_all = TRUE  )
+
+# plaatje aantal artikelen per dag
+NOS %>% group_by(Datum) %>% summarise(n=n()) %>% 
+  ggplot(aes(Datum,n)) + geom_line()
+
+```
+
+Eerst wat preparatie van de teksten, zoals niet alpha num characters en stopwoorden weghalen.
+
+```{r}
+#### prep functie
+prep_fun = function(x) {
+  x %>% 
+    # make text lower case
+    str_to_lower %>% 
+    # remove non-alphanumeric symbols
+    str_replace_all("[^[:alnum:]]", " ") %>% 
+    # collapse multiple spaces
+    str_replace_all("\\s+", " ")
+}
+#voorbeeldje
+tmp = "Blabla 123h    o *&^%"
+prep_fun(tmp)
+
+## gebruik bovenstaande prep functie om art te bewerken
+NOS = NOS %>% 
+  mutate(
+    id = 1:n(),
+    art = prep_fun(art),
+    NWoorden = str_count(art, "\\w+")
+  )
+
+## plaatje van aantal woorden en tabel met talen
+ggplot(NOS, aes(NWoorden)) + geom_histogram(bins=70, col="black")
+```
+
+
+Filter te korte en te lang artikelen er uit
+
+```{r eval = FALSE}
+NOS = NOS %>% 
+  filter(
+    NWoorden > 30,
+    NWoorden < 1000
+  ) 
+```
+
+We gaan nu de nieuwsberichten tokenizen en maken een vocabulaire zonder stopwoorden. 
+
+```{r eval = FALSE}
+## tokenize
+it_train = itoken(
+  NOS$art, 
+  preprocessor = prep_fun,
+  tokenizer = word_tokenizer, 
+  ids = NOS$id,
+  progressbar = TRUE
+)
+
+```
+
+Er zijn twee packages om makkelijk vectoren van stopwoorden te maken De packages `stopwords` en `tidystopwords`. Dit laatste package is iets uitgebreider.
+
+
+```{r eval = FALSE}
+stopwoorden = c(
+  stopwords::stopwords("nl"),
+  letters,
+  1:9,
+  c("volgens", "we")
+)
+
+stopwoorden2 = generate_stoplist(lang_name = "Dutch")
+```
+
+
+Maak nu een vocabulaire met de functie `create_vocabulaire` waar je ook ngrams kunt opgeven. Om niet te veel termen te genereren bekijk ik hier alleen 1 en 2 grams. Dus losse woorden en termen met twee aaneengesloten woorden.
+
+```{r eval = FALSE}
+vocab = create_vocabulary(
+  it_train,
+  ngram = c(1L,2L),
+  stopwords = stopwoorden
+)
+
+vocab
+```
+
+De vocabulaire bestaat uit (te) veel woorden, we kunnen gaan prunen. Haal te weinig en ook te veel voorkomende woorden weg.
+
+```{r eval = FALSE}
+pruned_vocab = prune_vocabulary(
+  vocab, 
+  term_count_min = 5, 
+  doc_proportion_max = 0.85,
+  doc_proportion_min = 0.0025
+)
+pruned_vocab
+```
+
+Maak een wordcloud voor eerste inzchten.
+
+```{r eval = FALSE}
+pal <- brewer.pal(9,"BuGn")
+pal <- pal[-(1:4)]
+
+wordcloud(
+  pruned_vocab$term, 
+  pruned_vocab$term_count,
+  scale = c(3,.2),
+  min.freq = 3000,
+  max.words = 200,
+  colors= pal)
+
+pruned_vocab %>%
+  filter(term_count > 1000) %>% 
+  wordcloud2( shape = "star")
+
+#Zipf's law
+pruned_vocab %>% 
+  arrange(desc(term_count)) %>% 
+  mutate(
+    rank = 1:n(),
+    
+  ) %>% 
+  ggplot(aes(log(rank),log2(term_count))) + geom_point()
+
+```
+
+
+And now perform topic modeling. Maak eerst een zogenaamde document term matrix aan. In deze matrix is het aantal rijen het aantal documenten / nieuwsberichten en het aantal kolommen is het aantal termen.
+
+```{r eval = FALSE}
+vectorizer = vocab_vectorizer(
+  vocabulary = pruned_vocab
+)
+dtm = create_dtm(it_train, vectorizer, type = "dgTMatrix")
+
+dim(dtm)
+dtm[1,]
+```
+
+
+```{r eval = FALSE}
+lda_model = LDA$new(
+  n_topics = 10, 
+  doc_topic_prior = 0.1, 
+  topic_word_prior = 0.01
+)
+
+doc_topic_distr = lda_model$fit_transform(
+  x = dtm, n_iter = 1000, 
+  convergence_tol = 0.0001, n_check_convergence = 25, 
+  progressbar = FALSE)
+
+```
+
+resultaat in de vorm van tabel en grafiek
+
+```{r eval = FALSE}
+## worden per topic
+onderwerpen = as.data.frame(
+  lda_model$get_top_words(
+    n = 15, lambda = 1
+  )
+)
+names(onderwerpen) = paste0("TOPIC_", 1:10)
+DT::datatable(onderwerpen,  options=list(pageLength = 15))
+
+
+NOS$topic = apply(doc_topic_distr, 1, which.max)
+NOS %>% group_by(topic) %>% summarise(n=n())
+
+####### visualisatie ##################
+
+## heel makkelijk een topic te spotten met engelse texten 
+lda_model$plot()
+
+```
+
+
+
 # Deeplearning 
+
+---
 
 In R kan je deeplearning modellen trainen met Keras met een Tensorflow back-end, we geven hier een simpel voorbeeld. Je kan vanuit het `keras` package tensorflow installeren. Zie ook mijn slides op [slideshare](https://www.slideshare.net/LonghowLam/keras-on-tensorflow-in-r-python) voor wat verdere uitleg en bekijk dit 'fantastische' boek: [deep learning in R](https://www.manning.com/books/deep-learning-with-r)
 
@@ -1305,327 +1633,9 @@ cat('Test accuracy:', scores[[2]], '\n')
 
 ```
 
+
+
 <br>
-
-# Tiijdreeks modellen met prophet
-
----
-
-Prophet is een facebook package voor tijdreeks data, die zij zelf ook intern gebruiken. In plaats van de traditionale manier van tijdreeks modellen maken met ARIMA, worden zogenaamde additieve regressie modellen gefit. Zie hier de [paper](https://peerj.com/preprints/3190.pdf).
-
-Hier een voorbeeld op gescrapte Billy verkopen van de Ikea website
-
-```{r eval=FALSE}
-library(prophet)
-
-## dagelijke ikea billy verkoop data
-DailyBilly = readRDS("data/DailyBilly.RDs")
-ggplot(DailyBilly, aes(x=ds, y = y)) +  
-  geom_point() +
-  geom_line(col="grey", alpha = 0.85) + 
-  scale_x_date(breaks = "1 month")
-
-## billy forcast, fit eerst het model
-BillyF = prophet(DailyBilly)
-
-## dan aantal dagen vooruit maken waarop je gaat forecastem
-future = make_future_dataframe(BillyF, periods = 90)
-forecast = predict(BillyF, future)
-
-plot(BillyF, forecast)
-```
-
-Bovenstaande werkt nog niet echt..... We zetten seasonality aan.
-
-```{r eval = FALSE}
-## billy forcast, fit eerst het model
-BillyF = prophet(
-  DailyBilly,
-  weekly.seasonality = TRUE ,
-  yearly.seasonality = TRUE, 
-  daily.seasonality = FALSE
-)
-
-## dan aantal dagen vooruit maken waarop je gaat forecastem
-future = make_future_dataframe(BillyF, periods = 90)
-forecast = predict(BillyF, future)
-
-plot(BillyF, forecast)
-prophet_plot_components(BillyF, forecast)
-```
-
-Met prohet kan je ook externe regressors toevoegen aan het model. Laten we eens wat KNMI data bekijken (Wind, temperatauur, zonnestraling en neerslag)
-
-```{r eval = FALSE}
-library(readr)
-library(ggplot2)
-
-KNMI_20180101 = read_csv(
-   "data/KNMI_20180101.txt", 
-   col_types = cols(YYYYMMDD = col_date(format = "%Y%m%d"))
-)
-
-DailyBilly2 = DailyBilly %>%
-  left_join(
-    KNMI_20180101, 
-    by = c("ds" = "YYYYMMDD")
-  )
-
-```
-
-Check eerst even of er wat correlatie is tussen y (de billy verkopen) en KNMI variabelen.
-
-```{r eval = FALSE}
-library(corrplot)
-M = cor(
-  DailyBilly2 %>% 
-    select(y, FHVEC, FHX, TG, TN, Q, RH)
-  )
-
-corrplot(
-  M, 
-  method = "ellipse",
-  diag = FALSE,
-  addCoef.col = "black"
-)
-```
-
-
-```{r eval = FALSE}
-## het model moet nog niet gefit worden voordat je de regressor er aan toevoegt.
-BillyF = prophet(
-  weekly.seasonality = TRUE ,
-  yearly.seasonality = TRUE, 
-  daily.seasonality = TRUE,
-  fit = FALSE
-)  %>%
-  add_regressor("TG") %>% 
-  fit.prophet(df = DailyBilly2)
-
-## voorspel Billy Verkopen voor 10 graden C en 25 graden C.
-future = make_future_dataframe(BillyF, periods = 30)
-future$TG = 100
-future = future %>%  filter(ds > "2017-10-01")
-forecast1 = predict(BillyF, future)
-future$TG = 250
-forecast2 = predict(BillyF, future)
-
-### zet de twee voorspellingen uit.
-ggplot(forecast1, aes(ds,yhat)) + 
-  geom_line() + 
-  geom_line(data = forecast2, aes(ds,yhat), col=2)
-```
-
-
-# Topic modeling
-
-Als je heel veel teksten / documenten hebt wil je vaak weten wat voor onderwerpen er in die documenten in hoofdlijnen zitten. Je kan dit doen met topic modeling, een vaak gebruikt algoritme is Latent Dirichlet Allocation (LDA) in het `text2vec` package.
-
-
----
-
-## NOS Nieuwsberichten
-
-Om het een en ander te illustreren heb ik wat NOS nieuwsberichten gescraped en bekijken we wat er voor topics te vinden zijn. 
-
-
-```{r, eval = FALSE}
-# packages nodig voor deze analyse
-library(text2vec)
-library(dplyr)
-library(stringr)
-library(wordcloud)
-library(wordcloud2)
-library(ggplot2)
-library(tidystopwords)
-library(stopwords)
-
-# lees data in
-NOS = readRDS("data/NOS_Nieuwsberichten.RDs")
-# ondubbel op artikel....
-NOS = distinct(NOS, titel, .keep_all = TRUE  )
-
-# plaatje aantal artikelen per dag
-NOS %>% group_by(Datum) %>% summarise(n=n()) %>% 
-  ggplot(aes(Datum,n)) + geom_line()
-
-```
-
-Eerst wat preparatie van de teksten, zoals niet alpha num characters en stopwoorden weghalen.
-
-```{r}
-#### prep functie
-prep_fun = function(x) {
-  x %>% 
-    # make text lower case
-    str_to_lower %>% 
-    # remove non-alphanumeric symbols
-    str_replace_all("[^[:alnum:]]", " ") %>% 
-    # collapse multiple spaces
-    str_replace_all("\\s+", " ")
-}
-#voorbeeldje
-tmp = "Blabla 123h    o *&^%"
-prep_fun(tmp)
-
-## gebruik bovenstaande prep functie om art te bewerken
-NOS = NOS %>% 
-  mutate(
-    id = 1:n(),
-    art = prep_fun(art),
-    NWoorden = str_count(art, "\\w+")
-  )
-
-## plaatje van aantal woorden en tabel met talen
-ggplot(NOS, aes(NWoorden)) + geom_histogram(bins=70, col="black")
-```
-
-
-Filter te korte en te lang artikelen er uit
-
-```{r eval = FALSE}
-NOS = NOS %>% 
-  filter(
-    NWoorden > 30,
-    NWoorden < 1000
-  ) 
-```
-
-We gaan nu de nieuwsberichten tokenizen en maken een vocabulaire zonder stopwoorden. 
-
-```{r eval = FALSE}
-## tokenize
-it_train = itoken(
-  NOS$art, 
-  preprocessor = prep_fun,
-  tokenizer = word_tokenizer, 
-  ids = NOS$id,
-  progressbar = TRUE
-)
-
-```
-
-Er zijn twee packages om makkelijk vectoren van stopwoorden te maken De packages `stopwords` en `tidystopwords`. Dit laatste package is iets uitgebreider.
-
-
-```{r eval = FALSE}
-stopwoorden = c(
-  stopwords::stopwords("nl"),
-  letters,
-  1:9,
-  c("volgens", "we")
-)
-
-stopwoorden2 = generate_stoplist(lang_name = "Dutch")
-```
-
-
-Maak nu een vocabulaire met de functie `create_vocabulaire` waar je ook ngrams kunt opgeven. Om niet te veel termen te genereren bekijk ik hier alleen 1 en 2 grams. Dus losse woorden en termen met twee aaneengesloten woorden.
-
-```{r eval = FALSE}
-vocab = create_vocabulary(
-  it_train,
-  ngram = c(1L,2L),
-  stopwords = stopwoorden
-)
-
-vocab
-```
-
-De vocabulaire bestaat uit (te) veel woorden, we kunnen gaan prunen. Haal te weinig en ook te veel voorkomende woorden weg.
-
-```{r eval = FALSE}
-pruned_vocab = prune_vocabulary(
-  vocab, 
-  term_count_min = 5, 
-  doc_proportion_max = 0.85,
-  doc_proportion_min = 0.0025
-)
-pruned_vocab
-```
-
-Maak een wordcloud voor eerste inzchten.
-
-```{r eval = FALSE}
-pal <- brewer.pal(9,"BuGn")
-pal <- pal[-(1:4)]
-
-wordcloud(
-  pruned_vocab$term, 
-  pruned_vocab$term_count,
-  scale = c(3,.2),
-  min.freq = 3000,
-  max.words = 200,
-  colors= pal)
-
-pruned_vocab %>%
-  filter(term_count > 1000) %>% 
-  wordcloud2( shape = "star")
-
-#Zipf's law
-pruned_vocab %>% 
-  arrange(desc(term_count)) %>% 
-  mutate(
-    rank = 1:n(),
-    
-  ) %>% 
-  ggplot(aes(log(rank),log2(term_count))) + geom_point()
-
-```
-
-
-And now perform topic modeling. Maak eerst een zogenaamde document term matrix aan. In deze matrix is het aantal rijen het aantal documenten / nieuwsberichten en het aantal kolommen is het aantal termen.
-
-```{r eval = FALSE}
-vectorizer = vocab_vectorizer(
-  vocabulary = pruned_vocab
-)
-dtm = create_dtm(it_train, vectorizer, type = "dgTMatrix")
-
-dim(dtm)
-dtm[1,]
-```
-
-
-```{r eval = FALSE}
-lda_model = LDA$new(
-  n_topics = 10, 
-  doc_topic_prior = 0.1, 
-  topic_word_prior = 0.01
-)
-
-doc_topic_distr = lda_model$fit_transform(
-  x = dtm, n_iter = 1000, 
-  convergence_tol = 0.0001, n_check_convergence = 25, 
-  progressbar = FALSE)
-
-```
-
-resultaat in de vorm van tabel en grafiek
-
-```{r eval = FALSE}
-## worden per topic
-onderwerpen = as.data.frame(
-  lda_model$get_top_words(
-    n = 15, lambda = 1
-  )
-)
-names(onderwerpen) = paste0("TOPIC_", 1:10)
-DT::datatable(onderwerpen,  options=list(pageLength = 15))
-
-
-NOS$topic = apply(doc_topic_distr, 1, which.max)
-NOS %>% group_by(topic) %>% summarise(n=n())
-
-####### visualisatie ##################
-
-## heel makkelijk een topic te spotten met engelse texten 
-lda_model$plot()
-
-```
-
-
-
 
 
 # The mlr package (OPTIONEEL)
