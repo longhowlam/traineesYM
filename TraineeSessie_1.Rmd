@@ -915,9 +915,9 @@ maak een nieuwe variabele die alleen de top 10 keuken neemt op aantal en de rest
 
 <br>
 
-# dplyr met externe data
+# Dplyr met externe data
 
-Je kan `dplyr` niet alleen gebruiken op data frames in R, ook kan je `dplyr` gebruiken op externe data in databases en, ook data in Spark. We geven hier eerst het Spark voorbeeld met het package `sparklyr`, en dan een MySQL voorbeeldje.
+Het mooie van `dplyr` is dat je het niet alleen kan gebruiken op data frames in R. Je kan het ook gebruiken op externe data in databases en, ook data in Spark. We geven hier eerst het Spark voorbeeld met het package `sparklyr`, en dan een MySQL voorbeeldje.
 
 ```{r, eval=FALSE}
 library(sparklyr)
@@ -979,7 +979,8 @@ Als je klaar bent: disconnect van MySQL
 dbDisconnect(con_sql)
 ```
 
-# ggplot2
+
+# Data visualiseren met `ggplot2`
 
 
 ---
@@ -989,6 +990,8 @@ The grammar of graphics: ggplot2. Een plot wordt gemaakt door layers op elkaar t
 Hieronder een eerste voorbeeldje van een ggplot op de `mtcars` data set.
 
 ```{r, eval=FALSE}
+library(ggplot2)
+
 ## een laag p
 p = ggplot(mtcars, aes(x=hp, y = mpg))
 p
@@ -1200,10 +1203,13 @@ ggplot(df, aes(x=x,y=y)) + geom_bin2d(bins = 100)
 
 ### geom_map
 
-Met geom_map kun je kaarten maken. Als je de kaart van Nederland wil maken zul je die eerst ergens vandaan moeten halen. Vanuit het `raster` package is er een handige functie `getData` om dit te doen.
+Met de functie `geom_map` kun je kaarten maken. Als je de kaart van Nederland wil maken zul je die eerst ergens vandaan moeten halen. Vanuit het `raster` package is er een handige functie `getData` om dit te doen. Deze moeten we nog door gSimplify en fortify halen voordat ze in ggplot gebruikt kunnen worden
 
 ```{r, eval = FALSE}
-NLD <- gSimplify(getData("GADM", country= "NLD", level=1), tol=0.001, TRUE)
+library(raster)
+library(rgeos)
+
+NLD <- gSimplify( getData("GADM", country= "NLD", level=1), tol=0.001, TRUE)
 NLD <- fortify(NLD)
 
 g1 <- ggplot() +
@@ -1238,9 +1244,7 @@ g2
 
 ### ggmap
 
-Er is recentelijk een makkelijkere manier met het package `ggmap`. Je kan hiermee kaartjes van google maps downloaden en als achtergrond kaart gebruiken voor plots.
-
-Helaas is dit niet meer gratis en moet je je registreren en een API key opvragen!!!  Je kan openstreetmaps of stamen maps gebruiken. Zie osm_test.R script als voorbeeld
+Er is recentelijk een makkelijkere manier met het package `ggmap`. Je kan hiermee kaartjes van Google maps met de functie `get_googlemap` downloaden en als achtergrond kaart gebruiken voor plots. Helaas is dit niet meer gratis en moet je je registreren en een API key opvragen!!!  
 
 ```{r, eval=FALSE}
 library(ggmap)
@@ -1256,6 +1260,52 @@ NLMap +
     na.rm = TRUE
   )
 
+```
+
+
+Je kan gelukkig ook de gratis openstreetmaps of stamen maps gebruiken. Hier onder een simpel voorbeeldje, plot de restaurants in Amsterdam op een kaartje.
+
+```{r, eval = FALSE}
+library(osmdata)
+library(sf)
+library(ggmap)
+
+
+amsterdam = restaurants %>% 
+  filter(
+    plaats == "Amsterdam",
+    !is.na(aantalreviews),
+    !is.na(LONGs),
+    !is.na(LATs)
+  )
+
+## transform data to a sf object (Simple Features object: open standard in data format for GIS 
+projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+amsterdam <- st_as_sf(
+  x = amsterdam,                         
+  coords = c("LONGs", "LATs"),
+  crs = projcrs
+)
+
+## De functie get_map gebruiken om een kaart te downloaden
+## de functie getbb kan je gebruiken om een bounding box van een plaats te krijgen
+amsterdam_map <- get_map(
+  getbb("Amsterdam"), 
+  maptype = "toner-background", 
+  source = "stamen"
+)
+
+# duurt eventjes
+ggmap(amsterdam_map) +
+  geom_sf(
+    data = amsterdam,
+    inherit.aes =FALSE,
+    aes(colour = aantalreviews, fill = aantalreviews),
+    alpha = .65,
+    size = 1,
+    shape = 21
+  )+
+  labs(title = "restaurants in Amsterdam", x="",y="")
 ```
 
 
