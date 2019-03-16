@@ -1342,7 +1342,7 @@ library(keras)
 ## De library keras bevat een makkelijke functie om de tensorflow backend  installeren, 
 ## dit werkt makkelijk op een linux machine en is niet echt ondersteunt op een windows machine!
 
- keras::install_keras()
+# keras::install_keras()
 ```
 
 ## Een simpel model
