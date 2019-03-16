@@ -1270,7 +1270,6 @@ library(osmdata)
 library(sf)
 library(ggmap)
 
-
 amsterdam = restaurants %>% 
   filter(
     plaats == "Amsterdam",
