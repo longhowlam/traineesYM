@@ -37,9 +37,13 @@ Begin met powerpoint slides over R gevolgd door intro in RStudio:
 
 ![](RStudio.png)
 
+## De R Console
+
+De R Console is een plek waar je snel even een kort stukje code, 1 functie of zo, wilt runnen. Type daar een R expressie in en Enter om te runnen. Output van scripts verschijnt ook in de R Console. Om langere stukken code te beheren is de console niet een handige omgeving, gebruik script windows of notebooks.
+
 ## R Projecten
 
-Organiseer je R werk in projecten. Een project kan bestaan uit verschillende scripts, notebooks, data en output, deze wil je handig in 1 folder hebben. In RStudio kan je heel handig met verschillende R projecten werken. Via de GUI kun je nieuwe projecten aanmaken en beheren: File > New Project...
+Organiseer altijd je werk R in projecten. Een project kan bestaan uit verschillende scripts, notebooks, data en output, deze wil je handig in 1 folder hebben. In RStudio kan je heel handig met verschillende R projecten werken. Via de GUI kun je nieuwe projecten aanmaken en beheren: File > New Project...
 
 
 
@@ -52,7 +56,7 @@ In een script type je R code en als je met de cursor op een regel staat kan je d
 
 ## R Notebooks / Markdown files
 
-R notebooks bevatten meer dan alleen R code, het is een 'compleet' document met R code, output en een beschrijvende verhaallijn. In een R project kun je ook meerdere van deze notebooks en scripts beheren. Notebooks maak je met Rmarkdown, een soort light weight markup language waarin je bijvoorbeeld headers, figuren en vet gedrukt kan specificeren. Deze R cursus werkt met R notebooks. Een notebook bevat **R code chunks** die je kan runnen.
+R notebooks bevatten meer dan alleen R code, het is een 'compleet' document met R code chuncks (en ook andere code chuncks, zoals Python of SQL), output en een beschrijvende verhaallijn. In een R project kun je ook meerdere van deze notebooks en scripts beheren. Notebooks maak je met Rmarkdown, een soort light weight markup language waarin je bijvoorbeeld headers, figuren en vet gedrukt kan specificeren. Deze R cursus werkt met R notebooks. Een notebook bevat **R code chunks** die je kan runnen.
 
 Als je op de 'Preview' knop drukt boven het R notebook krijg je een apart window te zien met het **resultaat van het R notebook**. Er wordt dan ook door RStudio een aparte file gemaakt die de naam <file_naam>.nb.html heeft. Dit is een html file die je kan delen met anderen.
  
@@ -62,10 +66,6 @@ Latex formules in markdown, geen probleem....
 
 $$ \lim_{x \to \infty} \exp(-x) = 0 $$
 
-
-## De R Console
-
-De R Console is een plek waar je snel even een kort stukje code wilt runnen. Type daar een R expressie in en Enter om te runnen. Output van scripts verschijnt ook in de R Console.
 
 ## Git version controle
 
@@ -220,14 +220,14 @@ my.cars = mtcars %>% .[2:6]
 
 ## kolom maken of wijzigen met mutate
 
-We zagen al dat je kolommen in een data frame kon maken of wijzigen met `$` 
+In de tijd voor dplyr kon je in R kolommen in een data frame kon maken of wijzigen met de `$` operator.
 
 ```{r, eval=FALSE}
 my.cars$kolom2  = rnorm(32)
 my.cars$kolom3  = my.cars$kolom2 + 9
 ```
 
-Maar met `mutate` kan je dit veel eleganter doen
+Maar met `mutate` in het dplyr package kan je dit veel eleganter doen
 
 ```{r, eval=FALSE}
 mycars = mtcars %>%
@@ -252,7 +252,7 @@ mycars = mtcars %>%
   )
 ```
 
-Je kan ook zelf gemaakte functies gebruiken in mutate.
+Je kan ook zelf gemaakte functies gebruiken in de functie `mutate`.
 
 ```{r, eval=FALSE}
 normalize = function(x){
@@ -683,7 +683,7 @@ str_locate(testset$Name, "Mr")
 
 ---
 
-In R kun je factor variabelen bewerken met functies uit het `forcats` package. We geven een aantal voorbeelden op random gegenereerde data
+In R kun je factor variabelen (categorische variabelen, zoals bijvoorbeeld "geslacht" met twee 'levels; man en vrouw) bewerken met functies uit het `forcats` package. We geven een aantal voorbeelden op random gegenereerde data
 
 ```{r, eval=FALSE}
 library(forcats)
@@ -830,7 +830,7 @@ tmp
 ```
 
 
-Tijdstippen kunnen in R ook worden weergegven met times
+Tijdstippen en datums met tijdstippen kunnen in R ook worden weergegven met een speciale data type `POSIXct`.
 
 
 ```{r, eval = FALSE}
@@ -849,17 +849,17 @@ MeetData = MeetData %>%
 
 ## durations en intervals
 
-Als je in R twee datums/times van elkaar aftrekt krijg je in R een duration 
+Als je in R twee datums/times van elkaar aftrekt krijg je in R een zogenaamde `difftime` data type, die een interval of duratie weergeeft.
 
 ```{r, eval = FALSE}
 MeetData = MeetData %>% 
   mutate(
     duur = ymd_hms("2018-02-01 00:00:00") - ymd_hms(tmp)
   )
-
+class(MeetData$duur)
 ```
 
-Ja kan durations ook zelf maken en optellen bij een datum
+Ja kan intervallen of durations ook zelf maken en optellen bij een datum.
 
 ```{r, eval = FALSE}
 testduur = dweeks(3)
@@ -1345,9 +1345,7 @@ restaurants %>% filter(prijs < 100) %>%
   geom_point() + facet_wrap(~keuken, ncol = 5) + geom_smooth()
 ```
 
-
-
-
+<br>
 
 # Interactive grafieken
 
@@ -1421,6 +1419,7 @@ If you have 3D data you can plot it in a 3D scatter plot
 p = plot_ly(data = mtcars, x=~mpg, y=~cyl, z = ~disp) 
 p
 ```
+
 A matrix with values can be plotted as a 3D surface plot
 
 ```{r, eval=FALSE}
@@ -1430,7 +1429,7 @@ plot_ly(z = ~volcano) %>% add_surface()
 
 ### ggplot integratie
 
-Je kan een grafiek maken met ggplot en dan de functie ``ggplotly` gebruiken om de grafiek interactief te maken. Als de grafiek veel punten bevat kan het sloom over komen.  Vandaar dat onderstaande voorbeeldje alleen 3000 punten sampled.
+Je kan een grafiek maken met ggplot en dan de functie `ggplotly` gebruiken om de grafiek interactief te maken. Als de grafiek veel punten bevat kan het sloom over komen.  Vandaar dat onderstaande voorbeeldje alleen 3000 punten sampled.
 
 ```{r, eval=FALSE}
 p = ggplot(
@@ -1662,7 +1661,7 @@ pc2_lf
 ```
 
 
-popup texts in leaflets kunnen ook images en animated animated images bevatten. See as an example [this leaflet of Amsterdam](http://www.lhldsd.nl/AmsterdamWijkenOverzichtAnimated.html) en [this shiny app](http://145.131.21.163:3838/sample-apps/amsterdam_panoramaimages/)
+Popup texts in leaflets kunnen ook images en animated animated images bevatten. See as an example [this leaflet of Amsterdam](http://www.lhldsd.nl/AmsterdamWijkenOverzichtAnimated.html) en [this shiny app](http://145.131.21.163:3838/sample-apps/amsterdam_panoramaimages/)
 
 
 ## Extra openstreetmap data met library osm en verschillende iconen
