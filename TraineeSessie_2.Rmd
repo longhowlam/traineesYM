@@ -327,7 +327,7 @@ myTitan %>% group_by(Sex) %>%  summarise(survival = mean(Target))
 
 ```
 
-Hoe kan je een idee krijgen van de relatie tussen een binaire target en een numerieke variabele? Gebruik smoothing plots
+Hoe kan je een idee krijgen van de relatie tussen een binaire target en een numerieke variabele? Gebruik smoothing plots.
 
 ```{r, eval = FALSE}
 library(ggplot2)
@@ -338,8 +338,6 @@ ggplot(myTitan, aes(Age, Target)) + geom_point()
 ### met smoothing, de curve laat de waargenomen survival rate zien per leeftijd
 ggplot(myTitan, aes(Age, Target)) + geom_point() + geom_smooth()
 ```
-
-
 
 
 ## logistic regression
@@ -398,11 +396,11 @@ ranger.out
 
 Extreme gradient boosting wordt de laatste tijd ook veel gebruikt in Kaggle competities. Zoals bij random forests is een xgboost model ook een ensemble van decision trees, maar de trees zijn nu niet onafhankelijk van elkaar. Eerst wordt een tree gefit, daarna een andere op basis van de eerste, etc.
 
-Met de library `xgboost` kan je in R extreme gradient boosting modellen fitten. De aanroep is anders dan wat we tot nu toe gezien hebben. De `xgboost` functie moet een matrix met input variabelen worden meegegeven.
+Met de library `xgboost` kan je in R extreme gradient boosting modellen fitten. De aanroep is anders dan wat we tot nu toe gezien hebben. De `xgboost` functie moet een matrix met input variabelen worden meegegeven. Een handige optie in xgboost is de zogenaamde `monotone_constraints` waar je kan opgeven dat een variabele monotoon dalend of stijgend moet zijn.
 
 ```{r, eval = FALSE}
 library(Matrix)
-Titan_Inputmatrix = sparse.model.matrix( Survived ~ Sex + Age + Pclass + Fare, data = TTrain)
+Titan_Inputmatrix = sparse.model.matrix(  ~ Sex + Age + Pclass + Fare, data = TTrain)
 
 ## hoe ziet zo'n input matrix er uit? eerste 15 rijen
 Titan_Inputmatrix[1:15,]
@@ -470,7 +468,7 @@ hist(pred_ranger$predictions[,2])
 En voor xgboost moet je ook de test set als matrix veranderen
 
 ```{r, eval = FALSE}
-Titan_Testmatrix = sparse.model.matrix( Survived ~ Sex + Age +Pclass + Fare, data = TTest)
+Titan_Testmatrix = sparse.model.matrix(  ~ Sex + Age +Pclass + Fare, data = TTest)
 pred_xgboost = predict(xgboost.out2, newdata = Titan_Testmatrix)
 
 ## hier zitten de predicties een vector
@@ -504,7 +502,7 @@ xgb.plot.shap(  Titan_Inputmatrix, model = xgboost.out2, top_n=100)
 
 ### Lift percentages
 
-Als we geen model hebben kan je de overall survival kans uitrekenen (op de test set:
+Als we geen model hebben kan je de overall survival kans uitrekenen (op de test set):
 
 ```{r, eval=FALSE}
 ## if you know nothing :-)
