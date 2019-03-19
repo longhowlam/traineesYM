@@ -540,6 +540,8 @@ Soms is het handig om data waarden in 1 kolom te hebben en een aparte variabele 
 ```{r, eval=FALSE}
 stocksm <- stocks %>% gather(stock, price, -time)
 
+## in de development versie van tidyr heb je vernieuwde functie
+tidyr::pivot_long(stocks, -time, names_to = "stock", values_to = "price")
 
 stocksm %>% group_by(stock) %>%  summarise(m = mean(price))
 ```
@@ -560,7 +562,14 @@ test = data.frame(
 
 test2 = test %>% spread(V,price)
 test2
+
+## en ook in de tidydevelopment versie heb je 
+pivot_wide()
 ```
+
+
+Zie ook https://tidyr.tidyverse.org/dev/articles/pivot.html
+
 
 Een handige functie in tidyr is `separate`, dit kan je gebruiken om een kolom uit elkaar te trekken. Standaard worden niet alfa numerieke tekens als separator gebruikt.
 
