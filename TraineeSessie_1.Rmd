@@ -1,5 +1,5 @@
 ---
-title: "Refresher data prep & interactive data visualiatie"
+title: "Data prep & interactive data visualiatie"
 author: "Longhow Lam"
 subtitle: "Trainee Sessie 01"
 always_allow_html: yes
@@ -159,7 +159,6 @@ mtcars = read_csv("mtcars.csv")
 saveRDS(mtcars, "mtcars.RDs")
 mtcars = readRDS("mtcars.RDs")
 ```
-
 
 Als je een R object hebt gemaakt, niet alleen een data frame maar elk object kan je deze afzonderlijk saven in een binair formaat (RDS) met de functie `saveRDS`.
 
